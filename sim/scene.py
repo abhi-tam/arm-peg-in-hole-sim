@@ -28,6 +28,15 @@ def xyaxes_to_quat(xyaxes) -> np.ndarray:
     return q
 
 
+def _solimp5(solimp) -> list[float]:
+    vals = [float(x) for x in solimp]
+    if len(vals) == 3:
+        return vals + [0.5, 2.0]
+    if len(vals) == 5:
+        return vals
+    raise ValueError(f"solimp must have 3 or 5 elements, got {len(vals)}")
+
+
 def _wedge_points(r_in: float, half: float, a0: float, a1: float) -> list[tuple[float, float]]:
     """2D corner points of the convex wedge between the bore and the square block."""
     rv = r_in / math.cos((a1 - a0) / 2)  # vertex radius so the chord is tangent at r_in
@@ -45,6 +54,7 @@ def _wedge_points(r_in: float, half: float, a0: float, a1: float) -> list[tuple[
 
 def add_hole_block(spec, P, clearance_mm, offset_mm=(0.0, 0.0), hole_mu=None):
     hb, c = P["scene"]["hole_block"], P["contact"]
+    solimp = _solimp5(c["solimp"])
     half = hb["size_m"][0] / 2
     height = hb["size_m"][2]
     r_in = 0.010 + clearance_mm * 1e-3
@@ -57,7 +67,7 @@ def add_hole_block(spec, P, clearance_mm, offset_mm=(0.0, 0.0), hole_mu=None):
     common = dict(
         friction=[mu, c["torsional"], c["rolling"]],
         solref=c["solref"],
-        solimp=c["solimp"],
+        solimp=solimp,
         condim=c["hole_condim"],
         priority=1,
     )
@@ -88,6 +98,7 @@ def add_hole_block(spec, P, clearance_mm, offset_mm=(0.0, 0.0), hole_mu=None):
 
 def add_peg(spec, P):
     p, c = P["scene"]["peg"], P["contact"]
+    solimp = _solimp5(c["solimp"])
     st = P["scene"]["start_state"]
     # Placeholder pose above the hole; final start pose relative to gripperframe is set in reset().
     pos = [
@@ -104,7 +115,7 @@ def add_peg(spec, P):
         density=p["density_kg_m3"],
         friction=[c["peg_friction"], c["torsional"], c["rolling"]],
         solref=c["solref"],
-        solimp=c["solimp"],
+        solimp=solimp,
         condim=3,
         priority=0,
         rgba=[0.85, 0.55, 0.20, 1],
@@ -119,6 +130,7 @@ def build_model(
 ) -> mujoco.MjModel:
     spec = mujoco.MjSpec.from_file(P["robot"]["model_path"])  # arm joints/actuators untouched
     S, C = P["sim"], P["contact"]
+    solimp = _solimp5(C["solimp"])
 
     # Solver / timestep: dt derived so control steps hold an integer number of substeps
     spec.option.timestep = 1.0 / (S["control_hz"] * S["substeps"])
@@ -139,7 +151,7 @@ def build_model(
         g.priority = 1
         g.friction = [C["peg_gripper_friction"], C["torsional"], C["rolling"]]
         g.condim = C["pad_condim"]
-        g.solref, g.solimp = C["solref"], C["solimp"]
+        g.solref, g.solimp = C["solref"], solimp
 
     # Table (top surface at z = 0)
     T = P["scene"]["table"]["half_size_m"]
@@ -150,15 +162,15 @@ def build_model(
         pos=[0.2, 0, -T[2]],
         friction=[C["table_friction"], C["torsional"], C["rolling"]],
         solref=C["solref"],
-        solimp=C["solimp"],
+        solimp=solimp,
         rgba=[0.75, 0.75, 0.75, 1],
     )
 
     spec.worldbody.add_light(
         name="main_light",
+        type=mujoco.mjtLightType.mjLIGHT_DIRECTIONAL,
         pos=[0.2, 0, 0.8],
         dir=[0, 0, -1],
-        directional=1,
         diffuse=[0.9, 0.9, 0.9],
         specular=[0.2, 0.2, 0.2],
     )
