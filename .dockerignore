@@ -1,0 +1,8 @@
+.git
+.venv
+data
+outputs
+checkpoints/*
+__pycache__
+wandb
+EOF

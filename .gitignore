@@ -222,16 +222,19 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-# Robotics
+# Robotics & ML artifacts
 data/
 outputs/
-checkpoints/*.safetensors
-checkpoints/*.pt
-checkpoints/*.bin
-*.mp4
-*.avi
+checkpoints/*
+!checkpoints/.gitkeep
+!checkpoints/download_weights.py
+wandb/
+*.safetensors
+*.pt
+*.bin
 *.h5
 *.hdf5
 *.parquet
 .DS_Store
 .env
+EOF

@@ -1,15 +1,17 @@
-# Engineering Decisions
+# Decision log (becomes the 2-page report)
+Started: $(date)   (4-day clock)
 
-## 1. Sim Choices & Justifications
-- Engine: MuJoCo (CPU physics + EGL rendering leaves ~7.5 GB of 8 GB VRAM for SmolVLA).
-- Timestep: 0.002 s (500 Hz) with Newton solver (50 iters).
-- Collision geometry: Primitive box/cylinder decomposition for hole so there are no mesh edge artifacts.
+## Sim choices
+- Engine: MuJoCo. CPU contact solver, EGL rendering, leaves GPU memory available for VLA workloads.
+- dt = 1/600 s, 20 substeps per 30 Hz control step (integer, no drift).
+- Contact: elliptic cone, impratio 10, solref [0.004, 1], condim 3 (hole) / 4 (pads).
+- Collision: hole = 48 convex wedge meshes (exact round bore) + floor box.
 
-## 2. Demonstrator & Data Generation Decisions
-- (Record success rates across 2.0 mm, 1.5 mm, 1.0 mm, 0.5 mm clearances here)
+## Demonstrator / data
 
-## 3. VLA Fine-Tuning & Tight-Clearance Architecture
-- (Record frozen vs. unfrozen layers, batch size, VRAM usage, and improvement method here)
+## VLA fine-tuning
 
-## 4. Sim-to-Real Gap & Next Steps (If Given +1 Week)
-- Real pretraining vs. synthetic renders, gear backlash/compliance on low-cost SO-101 servos, camera latency.
+## Tight-clearance improvement
+
+## Sim-to-real gap / next week
+EOF
