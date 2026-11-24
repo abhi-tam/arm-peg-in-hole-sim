@@ -221,3 +221,17 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Robotics
+data/
+outputs/
+checkpoints/*.safetensors
+checkpoints/*.pt
+checkpoints/*.bin
+*.mp4
+*.avi
+*.h5
+*.hdf5
+*.parquet
+.DS_Store
+.env
