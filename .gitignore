@@ -237,4 +237,4 @@ wandb/
 *.parquet
 .DS_Store
 .env
-EOF
+EOFMUJOCO_LOG.TXT

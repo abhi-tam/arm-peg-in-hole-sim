@@ -22,5 +22,6 @@ COPY requirements.txt .
 RUN pip install --upgrade pip && pip install -r requirements.txt
 
 COPY . .
+RUN pip install -e .
 ENTRYPOINT ["python"]
 CMD ["evaluate.py", "--help"]
