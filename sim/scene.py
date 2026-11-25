@@ -8,6 +8,12 @@ import yaml
 
 G = mujoco.mjtGeom
 
+# Grip pads (the SO-101 jaw collision meshes are convex hulls that fill the jaw gap).
+PAD_THETA = -0.0733          # rad: gripper joint angle at which the moving pad touches the peg
+PAD_HALF = [0.008, 0.010, 0.002]   # pad half sizes in gripperframe axes (x = pointing)
+PAD_CENTER_X = -0.004        # pad centre along the pointing axis (peg spans x -15..35 mm)
+PEG_R = 0.010
+
 
 def load_params(path: str = "sim_params.yaml") -> dict:
     with open(path) as f:
@@ -122,6 +128,61 @@ def add_peg(spec, P):
     )
 
 
+def add_grip_pads(spec, P):
+    """Flat box pads on the fixed and moving jaws, 20 mm apart around the peg.
+
+    The original jaw meshes are excluded from colliding with the peg (their convex hulls fill
+    the jaw gap), and the pads are excluded from the original jaw meshes.
+    """
+    c = P["contact"]
+    solimp = _solimp5(c["solimp"])
+    fixed_name, moving_name = P["robot"]["gripper_bodies"][0], P["robot"]["gripper_bodies"][1]
+
+    base = mujoco.MjModel.from_xml_path(P["robot"]["model_path"])
+    bd = mujoco.MjData(base)
+    bd.qpos[base.joint("gripper").qposadr[0]] = PAD_THETA
+    mujoco.mj_forward(base, bd)
+    sid = base.site(P["robot"]["gripperframe_site"]).id
+    sp = bd.site_xpos[sid].copy()
+    S = bd.site_xmat[sid].reshape(3, 3).copy()
+
+    def local_pose(body_name, c_site):
+        bid = base.body(body_name).id
+        Rb = bd.xmat[bid].reshape(3, 3)
+        pb = bd.xpos[bid]
+        w = sp + S @ np.asarray(c_site, float)
+        pos = Rb.T @ (w - pb)
+        q = np.zeros(4)
+        mujoco.mju_mat2Quat(q, (Rb.T @ S).flatten())
+        return pos, q
+
+    off = PEG_R + PAD_HALF[2]
+    for nm, parent, cz in (("pad_fixed", fixed_name, -off), ("pad_moving", moving_name, +off)):
+        pos, quat = local_pose(parent, [PAD_CENTER_X, 0.0, cz])
+        b = spec.body(parent).add_body(name=nm, pos=pos, quat=quat)
+        b.add_geom(
+            name=nm + "_geom",
+            type=G.mjGEOM_BOX,
+            size=PAD_HALF,
+            mass=1e-3,
+            friction=[c["peg_gripper_friction"], c["torsional"], c["rolling"]],
+            solref=c["solref"],
+            solimp=solimp,
+            condim=c["pad_condim"],
+            priority=1,
+            rgba=[0.15, 0.15, 0.15, 1],
+        )
+
+    k = 0
+    for pad in ("pad_fixed", "pad_moving"):
+        for other in (fixed_name, moving_name):
+            spec.add_exclude(name=f"ex_{k}", bodyname1=pad, bodyname2=other)
+            k += 1
+    for other in (fixed_name, moving_name):
+        spec.add_exclude(name=f"ex_{k}", bodyname1="peg", bodyname2=other)
+        k += 1
+
+
 def build_model(
     P: dict,
     clearance_mm: float | None = None,
@@ -147,7 +208,7 @@ def build_model(
     spec.visual.global_.offwidth = S["render_width"]
     spec.visual.global_.offheight = S["render_height"]
 
-    # Table
+    # Table (top surface at z = 0)
     T = P["scene"]["table"]["half_size_m"]
     spec.worldbody.add_geom(
         name="table_top",
@@ -180,8 +241,9 @@ def build_model(
         hole_mu,
     )
 
-    # Peg
+    # Peg + grip pads
     add_peg(spec, P)
+    add_grip_pads(spec, P)
 
     # Cameras
     W, O = P["cameras"]["wrist"], P["cameras"]["overhead"]
@@ -203,18 +265,12 @@ def build_model(
     # Compile first, then modify compiled gripper collision geoms
     model = spec.compile()
 
-    gbodies = {
-        model.body(n).id
-        for n in P["robot"]["gripper_bodies"]
-    }
+    gbodies = {model.body(n).id for n in P["robot"]["gripper_bodies"]}
 
     for gid in range(model.ngeom):
         if (
             model.geom_bodyid[gid] in gbodies
-            and (
-                model.geom_contype[gid]
-                or model.geom_conaffinity[gid]
-            )
+            and (model.geom_contype[gid] or model.geom_conaffinity[gid])
         ):
             model.geom_friction[gid] = [
                 C["peg_gripper_friction"],
@@ -227,50 +283,3 @@ def build_model(
             model.geom_solimp[gid] = solimp
 
     return model
-
-    # Table (top surface at z = 0)
-    T = P["scene"]["table"]["half_size_m"]
-    spec.worldbody.add_geom(
-        name="table_top",
-        type=G.mjGEOM_BOX,
-        size=T,
-        pos=[0.2, 0, -T[2]],
-        friction=[C["table_friction"], C["torsional"], C["rolling"]],
-        solref=C["solref"],
-        solimp=solimp,
-        rgba=[0.75, 0.75, 0.75, 1],
-    )
-
-    spec.worldbody.add_light(
-        name="main_light",
-        type=mujoco.mjtLightType.mjLIGHT_DIRECTIONAL,
-        pos=[0.2, 0, 0.8],
-        dir=[0, 0, -1],
-        diffuse=[0.9, 0.9, 0.9],
-        specular=[0.2, 0.2, 0.2],
-    )
-
-    add_hole_block(
-        spec,
-        P,
-        clearance_mm if clearance_mm is not None else P["scene"]["default_radial_clearance_mm"],
-        offset_mm,
-        hole_mu,
-    )
-    add_peg(spec, P)
-
-    # Cameras (spec values, converted from xyaxes to quaternions)
-    W, O = P["cameras"]["wrist"], P["cameras"]["overhead"]
-    spec.body(P["robot"]["wrist_camera_body"]).add_camera(
-        name="wrist",
-        pos=[0, 0, 0],
-        quat=xyaxes_to_quat(W["xyaxes"]),
-        fovy=W["fovy"],
-    )
-    spec.worldbody.add_camera(
-        name="overhead",
-        pos=O["pos"],
-        quat=xyaxes_to_quat(O["xyaxes"]),
-        fovy=O["fovy"],
-    )
-    return spec.compile()

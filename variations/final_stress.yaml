@@ -1,0 +1,16 @@
+- name: baseline_clr1.5
+  radial_clearance_mm: 1.5
+- name: clr_0.5
+  radial_clearance_mm: 0.5
+- name: tilt3_clr1.0
+  radial_clearance_mm: 1.0
+  peg_in_gripper: {tilt_deg: 3.0}
+- name: friction0.8_clr1.0
+  radial_clearance_mm: 1.0
+  peg_hole_friction: 0.8
+- name: hole_off5mm_clr1.0
+  radial_clearance_mm: 1.0
+  hole_offset_mm: {x: 5.0, y: 3.0}
+- name: latency100ms_clr1.0
+  radial_clearance_mm: 1.0
+  action_latency_ms: 100

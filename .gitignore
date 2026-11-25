@@ -238,3 +238,4 @@ wandb/
 .DS_Store
 .env
 EOFMUJOCO_LOG.TXT
+MUJOCO_LOG.TXT

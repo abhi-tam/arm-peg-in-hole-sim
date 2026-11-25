@@ -1,0 +1,8 @@
+- name: clr_2.0
+  radial_clearance_mm: 2.0
+- name: clr_1.5
+  radial_clearance_mm: 1.5
+- name: clr_1.0
+  radial_clearance_mm: 1.0
+- name: clr_0.5
+  radial_clearance_mm: 0.5

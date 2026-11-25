@@ -1,0 +1,13 @@
+- name: clr_1.0_bias0.3
+  radial_clearance_mm: 1.0
+- name: clr_0.5_bias0.3
+  radial_clearance_mm: 0.5
+- name: clr_0.5_bias0.6
+  radial_clearance_mm: 0.5
+  hole_est_bias_mm: 0.6
+- name: clr_1.0_tilt2
+  radial_clearance_mm: 1.0
+  peg_in_gripper: {tilt_deg: 2.0}
+- name: clr_0.5_tilt2
+  radial_clearance_mm: 0.5
+  peg_in_gripper: {tilt_deg: 2.0}
