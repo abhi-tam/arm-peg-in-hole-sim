@@ -128,11 +128,12 @@ def build_model(
     offset_mm=(0.0, 0.0),
     hole_mu: float | None = None,
 ) -> mujoco.MjModel:
-    spec = mujoco.MjSpec.from_file(P["robot"]["model_path"])  # arm joints/actuators untouched
+
+    spec = mujoco.MjSpec.from_file(P["robot"]["model_path"])
     S, C = P["sim"], P["contact"]
     solimp = _solimp5(C["solimp"])
 
-    # Solver / timestep: dt derived so control steps hold an integer number of substeps
+    # Solver / timestep
     spec.option.timestep = 1.0 / (S["control_hz"] * S["substeps"])
     spec.option.iterations = S["iterations"]
     spec.option.solver = mujoco.mjtSolver.mjSOL_NEWTON
@@ -142,16 +143,90 @@ def build_model(
         else mujoco.mjtCone.mjCONE_PYRAMIDAL
     )
     spec.option.impratio = S["impratio"]
+
     spec.visual.global_.offwidth = S["render_width"]
     spec.visual.global_.offheight = S["render_height"]
 
-    # Gripper pads: higher priority so peg-pad contact uses exact pad friction
-    for gname in P["robot"]["gripper_pad_geoms"]:
-        g = spec.geom(gname)
-        g.priority = 1
-        g.friction = [C["peg_gripper_friction"], C["torsional"], C["rolling"]]
-        g.condim = C["pad_condim"]
-        g.solref, g.solimp = C["solref"], solimp
+    # Table
+    T = P["scene"]["table"]["half_size_m"]
+    spec.worldbody.add_geom(
+        name="table_top",
+        type=G.mjGEOM_BOX,
+        size=T,
+        pos=[0.2, 0, -T[2]],
+        friction=[C["table_friction"], C["torsional"], C["rolling"]],
+        solref=C["solref"],
+        solimp=solimp,
+        rgba=[0.75, 0.75, 0.75, 1],
+    )
+
+    spec.worldbody.add_light(
+        name="main_light",
+        type=mujoco.mjtLightType.mjLIGHT_DIRECTIONAL,
+        pos=[0.2, 0, 0.8],
+        dir=[0, 0, -1],
+        diffuse=[0.9, 0.9, 0.9],
+        specular=[0.2, 0.2, 0.2],
+    )
+
+    # Hole
+    add_hole_block(
+        spec,
+        P,
+        clearance_mm
+        if clearance_mm is not None
+        else P["scene"]["default_radial_clearance_mm"],
+        offset_mm,
+        hole_mu,
+    )
+
+    # Peg
+    add_peg(spec, P)
+
+    # Cameras
+    W, O = P["cameras"]["wrist"], P["cameras"]["overhead"]
+
+    spec.body(P["robot"]["wrist_camera_body"]).add_camera(
+        name="wrist",
+        pos=[0, 0, 0],
+        quat=xyaxes_to_quat(W["xyaxes"]),
+        fovy=W["fovy"],
+    )
+
+    spec.worldbody.add_camera(
+        name="overhead",
+        pos=O["pos"],
+        quat=xyaxes_to_quat(O["xyaxes"]),
+        fovy=O["fovy"],
+    )
+
+    # Compile first, then modify compiled gripper collision geoms
+    model = spec.compile()
+
+    gbodies = {
+        model.body(n).id
+        for n in P["robot"]["gripper_bodies"]
+    }
+
+    for gid in range(model.ngeom):
+        if (
+            model.geom_bodyid[gid] in gbodies
+            and (
+                model.geom_contype[gid]
+                or model.geom_conaffinity[gid]
+            )
+        ):
+            model.geom_friction[gid] = [
+                C["peg_gripper_friction"],
+                C["torsional"],
+                C["rolling"],
+            ]
+            model.geom_priority[gid] = 1
+            model.geom_condim[gid] = C["pad_condim"]
+            model.geom_solref[gid] = C["solref"]
+            model.geom_solimp[gid] = solimp
+
+    return model
 
     # Table (top surface at z = 0)
     T = P["scene"]["table"]["half_size_m"]

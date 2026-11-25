@@ -14,7 +14,7 @@ robot:
   model_path: assets/SO101/so101_new_calib_camera.xml
   gripperframe_site: gripperframe
   wrist_camera_body: wrist_camera
-  gripper_pad_geoms: []     # FILL after running scripts/inspect_arm.py (Step 3.3)
+  gripper_bodies: [gripper, moving_jaw_so101_v1]   # collision geoms on these get peg-gripper contact params
 
 scene:
   table:
@@ -23,8 +23,8 @@ scene:
     center_xy_m: [0.220, 0.0]
     size_m: [0.050, 0.050, 0.030]
     hole_depth_m: 0.025
-    ring_segments: 48    
-  default_radial_clearance_mm: 1.5              # round hole approximated by 48 convex wedges
+    ring_segments: 48                  # round hole approximated by 48 convex wedges
+  default_radial_clearance_mm: 1.5
   peg:
     radius_m: 0.010
     length_m: 0.050
@@ -44,7 +44,7 @@ contact:
   torsional: 0.005
   rolling: 0.0001
   solref: [0.004, 1.0]       # timeconst 4 ms >= 2*dt (3.33 ms), MuJoCo's stability rule
-  solimp: [0.95, 0.99, 0.001, 0.5, 2.0]
+  solimp: [0.99, 0.999, 0.0002, 0.5, 2.0]
   hole_condim: 3
   pad_condim: 4              # torsional friction helps pads resist peg twisting
 

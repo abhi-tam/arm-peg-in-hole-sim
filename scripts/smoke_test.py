@@ -14,6 +14,8 @@ print("dt:", model.opt.timestep, "| substeps per control step:", round((1 / 30) 
 print("joints:", [model.joint(i).name for i in range(model.njnt)])
 print("cameras:", [model.cam(i).name for i in range(model.ncam)])
 print("contacts at start (should be ~0):", data.ncon)
+print("peg mass (want ~0.0195 kg):", model.body("peg").mass)
+assert np.isclose(model.body("peg").mass, 0.0195, atol=1e-3)
 
 # Overhead camera: right/up/back axes in world frame
 cid = model.cam("overhead").id
